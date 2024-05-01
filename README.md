@@ -1,3 +1,9 @@
+# Introduction
+Forked from [graspnet-baseline](https://openaccess.thecvf.com/content_CVPR_2020/papers/Fang_GraspNet-1Billion_A_Large-Scale_Benchmark_for_General_Object_Grasping_CVPR_2020_paper.pdf). Using an open-sourced pre-trained model, rewriting a class to infer and get the result.
+After installation and python environment configuration.
+```bash
+python graspnet_infer.py
+```
 # GraspNet Baseline
 Baseline model for "GraspNet-1Billion: A Large-Scale Benchmark for General Object Grasping" (CVPR 2020).
 
