@@ -2,14 +2,13 @@ import os
 import sys
 import numpy as np
 import open3d as o3d
-import argparse
-import importlib
 import scipy.io as scio
 from PIL import Image
 import cv2
 import torch
 from graspnetAPI import GraspGroup
 import math
+import copy
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(ROOT_DIR, 'models'))
 sys.path.append(os.path.join(ROOT_DIR, 'dataset'))
@@ -22,8 +21,9 @@ from data_utils import CameraInfo, create_point_cloud_from_depth_image
 
 class GraspNetInfer:
     def __init__(self, checkpoint_path="./checkpoints/checkpoint-rs.tar", num_point=20000, num_view=300, collision_thresh=0.01, voxel_size=0.01\
-                , img_resolution = (1280.0,720.0), vertical_fov = 45,factor_depth = 1):
-        self.checkpoint_path = checkpoint_path
+                , img_resolution = (960,960), vertical_fov = 45,factor_depth = 1):
+        self.checkpoint_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),checkpoint_path)
+        
         self.num_point = num_point
         self.num_view = num_view
         self.collision_thresh = collision_thresh
@@ -74,7 +74,22 @@ class GraspNetInfer:
         # set model to eval mode
         net.eval()
         return net
-    def process_image(self,rgb_image, depth_image,workspace_mask):
+    def change_boxes2masks(self,boxes):
+        # input the boxes and return the masks
+        # boxes is a list of [x1,y1,x2,y2]
+        # masks is a numpy array, 1 is the mask, 0 is the background
+        boxes = np.array(boxes,dtype=np.int32)
+        masks = np.zeros(self.img_resolution,dtype=np.bool_)
+        for box in boxes:
+            x1,y1,x2,y2 = box
+            x1 = max(0,x1-50)
+            y1 = max(0,y1-50)
+            x2 = min(self.img_resolution[1],x2+50)
+            y2 = min(self.img_resolution[0],y2+50)
+            masks[y1:y2,x1:x2] = 1
+        return masks
+    def process_image(self,rgb_image, depth_image,boxes):
+        workspace_mask = self.change_boxes2masks(boxes)
         depth = depth_image
         color = np.array(rgb_image,dtype=np.float32)
         color = color/255.0
@@ -110,7 +125,9 @@ class GraspNetInfer:
         end_points['cloud_colors'] = color_sampled
         return end_points, cloud
 
-    def infer(self,rgb_image,depth_image,workspace_mask):
+    def infer(self,rgb_image_raw,depth_image_raw,workspace_mask):
+        rgb_image = copy.deepcopy(rgb_image_raw)
+        depth_image = copy.deepcopy(depth_image_raw)
         end_points, cloud = self.process_image(rgb_image,depth_image,workspace_mask)
         gg = self.get_grasps(end_points)
         if self.collision_thresh > 0:
